@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import type { DoubanItem } from '@/lib/types';
 import { DoubanCard } from './video-card';
 
-const MOVIE_TAGS = ['热门', '最新', '经典', '豆瓣高分', '冷门佳片', '华语', '欧美', '韩国', '日本', '动画'];
+const MOVIE_TAGS = ['热门', '豆瓣高分', '最新', '经典', '华语', '欧美', '韩国', '日本', '动画', '冷门佳片'];
 const TV_TAGS = ['热门', '美剧', '英剧', '韩剧', '日剧', '国产剧', '港剧', '日本动画', '综艺', '纪录片'];
 const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
@@ -49,6 +49,7 @@ function DoubanView({ onPick }: { onPick: (title: string) => void }) {
   return (
     <section aria-label="影视推荐">
       <div className="flex items-center justify-between mb-3">
+        <h2 className="text-base font-semibold text-content">为你推荐</h2>
         <div className="flex items-center gap-2">
           <div className="flex bg-chip rounded-lg p-0.5">
             <TypeButton active={type === 'movie'} onClick={() => switchType('movie')}>
