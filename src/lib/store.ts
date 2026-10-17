@@ -208,6 +208,8 @@ interface AppState extends AppSettings {
   toggleSourceSelected: (key: string) => void;
   setSelectedKeys: (keys: string[]) => void;
   setEnvSources: (list: SourceConfig[]) => void;
+  /** 清空全部点播源（手动添加 + 订阅导入 + 当前预置），用于「恢复默认」后重新从服务端拉取 */
+  resetVodSources: () => void;
   addSubscription: (url: string, name?: string) => void;
   removeSubscription: (url: string) => void;
   /** 整体启用/停用某个订阅（停用只影响搜索时是否采用，不动各源的勾选状态） */
@@ -370,6 +372,17 @@ export const useAppStore = create<AppState>()(
           envSources: list,
           envKeysSeen: [...get().envKeysSeen, ...freshKeys],
           selectedKeys: [...get().selectedKeys, ...toSelect],
+        });
+      },
+
+      resetVodSources: () => {
+        // 清空点播源相关全部状态（含当前预置源与勾选），保留直播源与数据源订阅记录本身；
+        // 调用方随后重新 applyEnvPresets 会以服务端 DEFAULT_SOURCES 重新填充预置源并自动勾选
+        set({
+          customAPIs: [],
+          envSources: [],
+          envKeysSeen: [],
+          selectedKeys: [],
         });
       },
 

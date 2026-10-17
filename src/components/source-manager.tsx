@@ -28,7 +28,7 @@ import { PERSIST_KEY } from '@/lib/persist-storage';
 import { copyToClipboard } from '@/lib/clipboard';
 import { useAuth } from './auth';
 import { api } from '@/lib/client-api';
-import { syncSourceSubscription } from '@/lib/subscription-sync';
+import { syncSourceSubscription, applyEnvPresets } from '@/lib/subscription-sync';
 import { describeParseStats } from '@/lib/tvbox-parser';
 
 /**
@@ -224,6 +224,8 @@ function VodSourcesPanel() {
   const [editing, setEditing] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<VodFilter>('all');
+  const [pendingRestore, setPendingRestore] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const { tests, runTest } = useSourceTests();
   const { progress, probe, cancel, isProbing } = useSourceProbe();
 
@@ -278,6 +280,29 @@ function VodSourcesPanel() {
     toast(`已恢复 ${keys.length} 个源`, 'success');
   };
 
+  /** 恢复默认：清空当前全部点播源，重新从服务端拉取部署者预置的 DEFAULT_SOURCES */
+  const restoreDefault = async () => {
+    if (restoring) return;
+    setRestoring(true);
+    try {
+      store.resetVodSources();
+      // 重新拉取服务端预置数据（直接请求，不走 react-query 缓存，确保拿到最新）
+      const status = await api.status();
+      if (status) await applyEnvPresets(status);
+      const count = useAppStore.getState().envSources.length;
+      toast(
+        count > 0 ? `已恢复默认：重新加载服务器预置的 ${count} 个点播源` : '已清空所有点播源（服务器未预置源）',
+        count > 0 ? 'success' : 'info'
+      );
+    } catch (err) {
+      // 拉取失败时源已被清空，如实告知并提示可稍后重试
+      toast('恢复失败：无法从服务器获取预置源，当前点播源已清空', 'error');
+    } finally {
+      setRestoring(false);
+      setPendingRestore(false);
+    }
+  };
+
   const empty = store.envSources.length === 0 && store.customAPIs.length === 0;
 
   return (
@@ -286,10 +311,21 @@ function VodSourcesPanel() {
         title="点播源"
         hint={empty ? undefined : `共 ${all.length} 个 · 已启用 ${all.filter((s) => store.selectedKeys.includes(s.key)).length}`}
         extra={
-          <button className="btn-primary btn-sm" onClick={() => setEditing('__new__')}>
-            <Icon name="plus" className="w-3.5 h-3.5" />
-            添加 API
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              className="btn-ghost btn-sm"
+              onClick={() => setPendingRestore(true)}
+              disabled={restoring || (store.envSources.length === 0 && store.customAPIs.length === 0)}
+              title="删除当前全部点播源，重新从服务器获取预置源"
+            >
+              <Icon name="refresh" className="w-3.5 h-3.5" />
+              {restoring ? '恢复中…' : '恢复默认'}
+            </button>
+            <button className="btn-primary btn-sm" onClick={() => setEditing('__new__')}>
+              <Icon name="plus" className="w-3.5 h-3.5" />
+              添加 API
+            </button>
+          </div>
         }
       />
 
@@ -403,6 +439,21 @@ function VodSourcesPanel() {
           )}
         </>
       )}
+
+      {/* 重操作：恢复默认会清空全部当前点播源（含手动添加与订阅导入的），先确认再执行 */}
+      <ConfirmDialog
+        open={pendingRestore}
+        danger
+        title="恢复默认点播源？"
+        message={
+          store.customAPIs.length > 0
+            ? `将删除当前全部点播源（含你手动添加的 ${store.customAPIs.length} 个源），重新从服务器获取预置源。`
+            : '将删除当前全部点播源，重新从服务器获取预置源。'
+        }
+        confirmLabel="恢复默认"
+        onCancel={() => setPendingRestore(false)}
+        onConfirm={() => void restoreDefault()}
+      />
     </section>
   );
 }
